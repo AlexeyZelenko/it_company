@@ -113,7 +113,7 @@ const navigateToAllServices = () => {
   </section>
 </template>
 
-<style scoped>
+<style>
 .services {
   .p-card {
     height: 100%;
