@@ -63,8 +63,7 @@ const menuItems = computed<MenuItem[]>(() => [
   {
     label: 'Admin',
     icon: 'pi pi-shield',
-    route: 'admin-dashboard',
-    visible: !!auth.currentUser?.uid,
+    route: 'admin-dashboard'
   },
 ]);
 

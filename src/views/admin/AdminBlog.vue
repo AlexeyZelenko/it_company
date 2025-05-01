@@ -1,103 +1,99 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useToast } from 'primevue/usetoast';
-import DataTable from 'primevue/datatable';
-import Column from 'primevue/column';
-import Button from 'primevue/button';
-import Dialog from 'primevue/dialog';
-import InputText from 'primevue/inputtext';
-import Textarea from 'primevue/textarea';
-import Editor from 'primevue/editor';
-import FileUpload from 'primevue/fileupload';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp, DocumentData, QuerySnapshot } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from '@/firebase';
-import slugify from 'slugify';
+import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useToast } from 'primevue/usetoast'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
+import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
+import Textarea from 'primevue/textarea'
+import Editor from 'primevue/editor'
+import FileUpload from 'primevue/fileupload'
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp } from 'firebase/firestore'
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
+import { db, storage } from '@/firebase'
+import slugify from 'slugify'
+import type { ToastMessageOptions } from 'primevue/toast'
 
-interface Post {
-  id?: string;
-  title: string;
-  shortDescription: string;
-  content: string;
-  image: string;
-  tags: string[];
-  publishDate: Date | Timestamp;
-  formattedDate?: string;
-  viewCount?: number;
-  likes?: number;
-  createdAt?: Date | Timestamp;
-  updatedAt?: Date | Timestamp;
-  readingTime?: any;
-  slug?: string;
+// Типы для данных блога
+interface BlogPost {
+  id: string
+  title: string
+  shortDescription: string
+  content: string
+  image: string
+  tags: string[] | string
+  publishDate: Timestamp | Date
+  formattedDate?: string
+  slug?: string
+  readingTime?: number
+  viewCount?: number
+  likes?: number
+  createdAt?: Timestamp | Date
+  updatedAt?: Timestamp | Date
 }
 
-interface FormState {
-  title: string;
-  shortDescription: string;
-  content: string;
-  image: string;
-  tags: string;
-  publishDate: Date;
-  readingTime: any;
+interface BlogPostForm {
+  title: string
+  shortDescription: string
+  content: string
+  image: string
+  tags: string
+  publishDate: Date
+  readingTime?: any
 }
 
 const { t: _t } = useI18n()
-const toast = useToast();
+const toast = useToast()
 
-const posts = ref<Post[]>([]);
-const loading = ref<boolean>(true);
-const dialog = ref<boolean>(false);
-const deleteDialog = ref<boolean>(false);
-const selectedPost = ref<Post | null>(null);
-const uploadedFile = ref<File | null>(null);
-const src = ref<string | ArrayBuffer | null | any>(null);
+const posts = ref<BlogPost[]>([])
+const loading = ref<boolean>(true)
+const dialog = ref<boolean>(false)
+const deleteDialog = ref<boolean>(false)
+const selectedPost = ref<BlogPost | null>(null)
+const uploadedFile = ref<File | null>(null)
+const src = ref<string | null>(null)
 
-const form = ref<FormState>({
+const form = ref<BlogPostForm>({
   title: '',
   shortDescription: '',
   content: '',
   image: '',
   tags: '',
-  publishDate: new Date(),
-  readingTime: null,
-});
+  publishDate: new Date()
+})
 
-onMounted(async () => {
-  await loadPosts();
-});
-
-const loadPosts = async () => {
+// Загрузка постов
+const loadPosts = async (): Promise<void> => {
   try {
-    const postsSnapshot: QuerySnapshot<DocumentData> = await getDocs(collection(db, 'blog'));
-    posts.value = postsSnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        publishDate: (data.publishDate as Timestamp).toDate(),
-        formattedDate: (data.publishDate as Timestamp).toDate().toLocaleDateString(),
-        tags: data.tags || [], // Ensure tags is always an array
-        viewCount: data.viewCount || 0,
-        likes: data.likes || 0,
-        readingTime: data.readingTime || 0,
-      } as Post;
-    });
-  } catch (error: any) {
-    console.error('Error loading posts:', error);
-    toast.add({
+    const postsSnapshot = await getDocs(collection(db, 'blog'))
+    posts.value = postsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      formattedDate: new Date(doc.data().publishDate.toDate()).toLocaleDateString()
+    })) as BlogPost[]
+  } catch (error) {
+    console.error('Error loading posts:', error)
+    showToast({
       severity: 'error',
       summary: 'Помилка',
       detail: 'Не вдалося завантажити статті',
-      life: 3000,
-    });
+      life: 3000
+    })
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
-const openNew = () => {
-  selectedPost.value = null;
+// Вспомогательная функция для уведомлений
+const showToast = (options: ToastMessageOptions): void => {
+  toast.add(options)
+}
+
+// Открытие формы для новой статьи
+const openNew = (): void => {
+  selectedPost.value = null
   form.value = {
     title: '',
     shortDescription: '',
@@ -105,152 +101,163 @@ const openNew = () => {
     image: '',
     tags: '',
     publishDate: new Date(),
-    readingTime: 0,
-  };
-  uploadedFile.value = null;
-  src.value = null;
-  dialog.value = true;
-};
+    readingTime: 0
+  }
+  uploadedFile.value = null
+  dialog.value = true
+}
 
-const editPost = (post: Post) => {
-  selectedPost.value = post;
+// Редактирование статьи
+const editPost = (post: BlogPost): void => {
+  selectedPost.value = post
   form.value = {
     ...post,
-    tags: Array.isArray(post.tags) ? post.tags.join(', ') : post.tags,
-    publishDate: post.publishDate ? (post.publishDate as Timestamp).toDate() : new Date(),
-    image: post.image || '',
-    readingTime: post.readingTime !== undefined ? post.readingTime : 0,
-  };
-  uploadedFile.value = null;
-  src.value = post.image || null;
-  dialog.value = true;
-};
+    tags: Array.isArray(post.tags) ? post.tags.join(', ') : post.tags || '',
+    publishDate: post.publishDate instanceof Timestamp ? post.publishDate.toDate() : post.publishDate,
+    image: post.image || ''
+  }
+  uploadedFile.value = null
+  dialog.value = true
+}
 
-const confirmDelete = (post: Post) => {
-  selectedPost.value = post;
-  deleteDialog.value = true;
-};
+// Подтверждение удаления
+const confirmDelete = (post: BlogPost): void => {
+  selectedPost.value = post
+  deleteDialog.value = true
+}
 
-const deletePost = async () => {
-  if (!selectedPost.value?.id) return;
+// Удаление статьи
+const deletePost = async (): Promise<void> => {
+  if (!selectedPost.value) return
 
   try {
+    // Удаление изображения из Firebase Storage
     if (selectedPost.value.image) {
-      const imageRef = storageRef(storage, selectedPost.value.image);
+      const imageRef = storageRef(storage, selectedPost.value.image)
       await deleteObject(imageRef).catch(error => {
-        console.error('Error deleting image from storage:', error);
-        toast.add({
+        console.error('Error deleting image from storage:', error)
+        showToast({
           severity: 'warn',
           summary: 'Попередження',
           detail: 'Не вдалося видалити зображення зі сховища',
-          life: 3000,
-        });
-      });
+          life: 3000
+        })
+      })
     }
 
-    await deleteDoc(doc(db, 'blog', selectedPost.value.id));
-    await loadPosts();
-    deleteDialog.value = false;
-    toast.add({
+    await deleteDoc(doc(db, 'blog', selectedPost.value.id))
+    await loadPosts()
+    deleteDialog.value = false
+    showToast({
       severity: 'success',
       summary: 'Успіх',
       detail: 'Статтю видалено',
-      life: 3000,
-    });
-  } catch (error: any) {
-    console.error('Error deleting post:', error);
-    toast.add({
+      life: 3000
+    })
+  } catch (error) {
+    console.error('Error deleting post:', error)
+    showToast({
       severity: 'error',
       summary: 'Помилка',
       detail: 'Не вдалося видалити статтю',
-      life: 3000,
-    });
+      life: 3000
+    })
   }
-};
+}
 
-const savePost = async () => {
+// Сохранение статьи
+const savePost = async (): Promise<void> => {
   try {
-    const postData: Omit<Post, 'id' | 'formattedDate'> = {
+    const postData = {
       ...form.value,
       slug: slugify(form.value.title, { lower: true }),
       tags: form.value.tags.split(',').map(tag => tag.trim()),
-      publishDate: form.value.publishDate,
-      updatedAt: new Date(),
-      readingTime: form.value.readingTime !== null ? form.value.readingTime : 0,
-    };
+      publishDate: new Date(form.value.publishDate),
+      updatedAt: new Date()
+    }
 
+    // Загрузка нового изображения
     if (uploadedFile.value) {
-      const file = uploadedFile.value;
-      const imageName = `blog/${Date.now()}_${file.name}`;
-      const imageRef = storageRef(storage, imageName);
-      const snapshot = await uploadBytes(imageRef, file);
-      postData.image = await getDownloadURL(snapshot.ref);
+      const file = uploadedFile.value
+      const imageName = `blog/${Date.now()}_${file.name}`
+      const imageRef = storageRef(storage, imageName)
+      const snapshot = await uploadBytes(imageRef, file)
+      postData.image = await getDownloadURL(snapshot.ref)
 
+      // Удаление старого изображения
       if (selectedPost.value?.image && selectedPost.value.image !== postData.image) {
-        const prevImageRef = storageRef(storage, selectedPost.value.image);
+        const prevImageRef = storageRef(storage, selectedPost.value.image)
         await deleteObject(prevImageRef).catch(error => {
-          console.error('Error deleting previous image:', error);
-          toast.add({
+          console.error('Error deleting previous image:', error)
+          showToast({
             severity: 'warn',
             summary: 'Попередження',
             detail: 'Не вдалося видалити попереднє зображення зі сховища',
-            life: 3000,
-          });
-        });
+            life: 3000
+          })
+        })
       }
     }
 
-    if (selectedPost.value?.id) {
-      await updateDoc(doc(db, 'blog', selectedPost.value.id), postData);
+    // Обновление или создание статьи
+    if (selectedPost.value) {
+      await updateDoc(doc(db, 'blog', selectedPost.value.id), postData)
     } else {
       await addDoc(collection(db, 'blog'), {
         ...postData,
         createdAt: new Date(),
         viewCount: 0,
-        likes: 0,
-      });
+        likes: 0
+      })
     }
 
-    await loadPosts();
-    dialog.value = false;
-    toast.add({
+    await loadPosts()
+    dialog.value = false
+    showToast({
       severity: 'success',
       summary: 'Успіх',
-      detail: selectedPost.value?.id ? 'Статтю оновлено' : 'Статтю створено',
-      life: 3000,
-    });
-  } catch (error: any) {
-    console.error('Error saving post:', error);
-    toast.add({
+      detail: selectedPost.value ? 'Статтю оновлено' : 'Статтю створено',
+      life: 3000
+    })
+  } catch (error) {
+    console.error('Error saving post:', error)
+    showToast({
       severity: 'error',
       summary: 'Помилка',
       detail: 'Не вдалося зберегти статтю',
-      life: 3000,
-    });
+      life: 3000
+    })
   } finally {
-    uploadedFile.value = null;
-    src.value = null;
+    uploadedFile.value = null
   }
-};
+}
 
-function onFileSelect(event: any) {
-  const file: File = event.files[0];
-  uploadedFile.value = file;
-  const reader = new FileReader();
+// Обработка выбора файла
+const onFileSelect = (event: { files: File[] }): void => {
+  const file = event.files[0]
+  uploadedFile.value = file
+  const reader = new FileReader()
 
-  toast.add({
+  showToast({
     severity: 'success',
     summary: 'Успіх',
     detail: 'Зображення готове до завантаження при збереженні',
-    life: 3000,
-  });
+    life: 3000
+  })
 
-  reader.onload = (e) => {
-    src.value = e.target?.result || null;
-  };
+  reader.onload = (e: ProgressEvent<FileReader>) => {
+    if (e.target?.result) {
+      src.value = e.target.result as string
+    }
+  }
 
-  reader.readAsDataURL(file);
+  reader.readAsDataURL(file)
 }
+
+// Загрузка постов при монтировании
+onMounted(async () => {
+  await loadPosts()
+})
 </script>
 
 <template>
@@ -258,17 +265,17 @@ function onFileSelect(event: any) {
     <div class="flex justify-between items-center mb-4">
       <h1 class="text-2xl font-bold">Керування блогом</h1>
       <Button
-          label="Нова стаття"
-          icon="pi pi-plus"
-          @click="openNew"
+        label="Нова стаття"
+        icon="pi pi-plus"
+        @click="openNew"
       />
     </div>
 
     <DataTable
-        :value="posts"
-        :loading="loading"
-        responsiveLayout="scroll"
-        class="p-datatable-lg"
+      :value="posts"
+      :loading="loading"
+      responsiveLayout="scroll"
+      class="p-datatable-lg"
     >
       <Column field="title" header="Назва">
         <template #body="{ data }">
@@ -285,14 +292,14 @@ function onFileSelect(event: any) {
         <template #body="{ data }">
           <div class="flex gap-2">
             <Button
-                icon="pi pi-pencil"
-                class="p-button-rounded p-button-success p-button-text"
-                @click="editPost(data)"
+              icon="pi pi-pencil"
+              class="p-button-rounded p-button-success p-button-text"
+              @click="editPost(data)"
             />
             <Button
-                icon="pi pi-trash"
-                class="p-button-rounded p-button-danger p-button-text"
-                @click="confirmDelete(data)"
+              icon="pi pi-trash"
+              class="p-button-rounded p-button-danger p-button-text"
+              @click="confirmDelete(data)"
             />
           </div>
         </template>
@@ -300,10 +307,10 @@ function onFileSelect(event: any) {
     </DataTable>
 
     <Dialog
-        v-model:visible="dialog"
-        :style="{width: '80vw'}"
-        :modal="true"
-        :header="selectedPost ? 'Редагувати статтю' : 'Нова стаття'"
+      v-model:visible="dialog"
+      :style="{width: '80vw'}"
+      :modal="true"
+      :header="selectedPost ? 'Редагувати статтю' : 'Нова стаття'"
     >
       <div class="grid grid-cols-1 gap-4">
         <div class="field">
@@ -314,18 +321,18 @@ function onFileSelect(event: any) {
         <div class="field">
           <label for="shortDescription">Короткий опис</label>
           <Textarea
-              id="shortDescription"
-              v-model="form.shortDescription"
-              rows="3"
-              class="w-full"
+            id="shortDescription"
+            v-model="form.shortDescription"
+            rows="3"
+            class="w-full"
           />
         </div>
 
         <div class="field">
           <label for="content">Контент</label>
           <Editor
-              v-model="form.content"
-              editorStyle="height: 320px"
+            v-model="form.content"
+            editorStyle="height: 320px"
           />
         </div>
 
@@ -333,18 +340,18 @@ function onFileSelect(event: any) {
           <label>Зображення</label>
           <div class="flex gap-4 items-center">
             <img
-                v-if="form.image"
-                :src="form.image"
-                class="w-32 h-32 object-cover rounded"
+              v-if="form.image"
+              :src="form.image"
+              class="w-32 h-32 object-cover rounded"
             >
             <FileUpload mode="basic" @select="onFileSelect" customUpload auto severity="secondary" class="p-button-outlined" />
-            <img v-if="src" :src="src || ''" alt="Image" class="shadow-md rounded-xl w-full sm:w-64" style="filter: grayscale(100%)" />
+            <img v-if="src" :src="src" alt="Image" class="shadow-md rounded-xl w-full sm:w-64" style="filter: grayscale(100%)" />
           </div>
         </div>
 
         <div class="field">
           <label for="reading">Час читання</label>
-          <InputText id="reading" v-model.number="form.readingTime" class="w-full" />
+          <InputText id="reading" v-model="form.readingTime" class="w-full" />
         </div>
 
         <div class="field">
@@ -355,25 +362,25 @@ function onFileSelect(event: any) {
 
       <template #footer>
         <Button
-            label="Скасувати"
-            icon="pi pi-times"
-            class="p-button-text"
-            @click="dialog = false"
+          label="Скасувати"
+          icon="pi pi-times"
+          class="p-button-text"
+          @click="dialog = false"
         />
         <Button
-            label="Зберегти"
-            icon="pi pi-check"
-            class="p-button-primary"
-            @click="savePost"
+          label="Зберегти"
+          icon="pi pi-check"
+          class="p-button-primary"
+          @click="savePost"
         />
       </template>
     </Dialog>
 
     <Dialog
-        v-model:visible="deleteDialog"
-        :style="{width: '450px'}"
-        header="Підтвердження"
-        :modal="true"
+      v-model:visible="deleteDialog"
+      :style="{width: '450px'}"
+      header="Підтвердження"
+      :modal="true"
     >
       <div class="confirmation-content">
         <i class="pi pi-exclamation-triangle mr-3" style="font-size: 2rem" />
@@ -381,16 +388,16 @@ function onFileSelect(event: any) {
       </div>
       <template #footer>
         <Button
-            label="Ні"
-            icon="pi pi-times"
-            class="p-button-text"
-            @click="deleteDialog = false"
+          label="Ні"
+          icon="pi pi-times"
+          class="p-button-text"
+          @click="deleteDialog = false"
         />
         <Button
-            label="Так"
-            icon="pi pi-check"
-            class="p-button-danger"
-            @click="deletePost"
+          label="Так"
+          icon="pi pi-check"
+          class="p-button-danger"
+          @click="deletePost"
         />
       </template>
     </Dialog>

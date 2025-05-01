@@ -376,7 +376,6 @@ const onFileSelect = (event: any) => {
           <label>Зображення</label>
           <div class="flex flex-col gap-4 items-start justify-start mt-2">
             <FileUpload mode="basic" @select="onFileSelect" customUpload auto severity="secondary" class="p-button-outlined" />
-            // @ts-ignore
             <img v-if="src || form.image" :src="src || form.image" alt="Image" class="shadow-md rounded-xl w-full sm:w-64" style="filter: grayscale(100%)" />
           </div>
           <Button
