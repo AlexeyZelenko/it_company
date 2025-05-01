@@ -77,8 +77,7 @@ const navigateToPost = (slug: string) => {
       <!-- Search -->
       <div class="max-w-xl mx-auto mb-12">
         <span class="p-input-icon-left w-full">
-          <i class="pi pi-search" />
-          <InputText 
+          <InputText
             v-model="searchQuery"
             :placeholder="t('common.search')"
             class="w-full"
@@ -117,7 +116,7 @@ const navigateToPost = (slug: string) => {
               </div>
               <div class="flex items-center">
                 <i class="pi pi-clock mr-1"></i>
-                <span>{{ t('common.minutesToRead', { n: post.readingTime }) }}</span>
+                <span>{{ t('common.minutesToRead', { n: post.readingTime || 5 }) }}</span>
               </div>
               <div class="flex items-center">
                 <i class="pi pi-eye mr-1"></i>

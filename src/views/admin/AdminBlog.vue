@@ -67,7 +67,8 @@ const openNew = () => {
     content: '',
     image: '',
     tags: '',
-    publishDate: new Date()
+    publishDate: new Date(),
+    readingTime: 0
   }
   uploadedFile.value = null
   dialog.value = true
@@ -193,16 +194,25 @@ const savePost = async () => {
   }
 }
 
-const onUpload = (event) => {
-  const file = event.files[0]
-  uploadedFile.value = file // Зберігаємо завантажений файл
-  // URL-адреса завантаження отримується в savePost
+const src = ref(null);
+
+function onFileSelect(event) {
+  const file = event.files[0];
+  uploadedFile.value = file
+  const reader = new FileReader();
+
   toast.add({
     severity: 'success',
     summary: 'Успіх',
     detail: 'Зображення готове до завантаження при збереженні',
     life: 3000
   })
+
+  reader.onload = async (e) => {
+    src.value = e.target.result;
+  };
+
+  reader.readAsDataURL(file);
 }
 </script>
 
@@ -290,15 +300,14 @@ const onUpload = (event) => {
               :src="form.image"
               class="w-32 h-32 object-cover rounded"
             >
-            <FileUpload
-              mode="basic"
-              :auto="false"
-              accept="image/*"
-              :maxFileSize="1000000"
-              @upload="onUpload"
-              label="Вибрати зображення"
-            />
+            <FileUpload mode="basic" @select="onFileSelect" customUpload auto severity="secondary" class="p-button-outlined" />
+            <img v-if="src" :src="src" alt="Image" class="shadow-md rounded-xl w-full sm:w-64" style="filter: grayscale(100%)" />
           </div>
+        </div>
+
+        <div class="field">
+          <label for="reading">Час читання</label>
+          <InputText id="reading" v-model="form.readingTime" class="w-full" />
         </div>
 
         <div class="field">

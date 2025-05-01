@@ -83,7 +83,7 @@ const navigateToBlog = () => {
               </div>
               <div class="flex items-center">
                 <i class="pi pi-clock mr-1"></i>
-                <span>{{ t('common.minutesToRead', { n: post.readingTime || 5 }) }}</span>
+                <span>{{ t('common.minutesToRead', { n: post.readingTime || Math.random(0.3).toFixed(1) * 10 }) }}</span>
               </div>
               <div class="flex items-center">
                 <i class="pi pi-eye mr-1"></i>

@@ -17,46 +17,56 @@ const languages = ref([
   { name: 'ENG', value: 'en' }
 ])
 
+// Обновленный вариант меню с прямыми маршрутами
 const menuItems = computed(() => [
   {
     label: t('common.home'),
     icon: 'pi pi-home',
-    command: () => router.push({ name: 'home' })
+    route: 'home'
   },
   {
     label: t('common.services'),
     icon: 'pi pi-cog',
-    command: () => router.push({ name: 'services' })
+    route: 'services'
   },
   {
     label: t('common.blog'),
     icon: 'pi pi-book',
-    command: () => router.push({ name: 'blog' })
+    route: 'blog'
   },
   {
     label: t('common.faq'),
     icon: 'pi pi-question-circle',
-    command: () => router.push({ name: 'faq' })
+    route: 'faq'
   },
   {
     label: t('common.contacts'),
     icon: 'pi pi-envelope',
-    command: () => router.push({ name: 'contacts' })
+    route: 'contacts'
   },
   {
-    label: 'admin',
-    icon: 'pi pi-envelope',
-    command: () => router.push({ name: 'admin-dashboard' })
+    label: 'Admin',
+    icon: 'pi pi-shield',
+    route: 'admin-dashboard'
   }
 ])
+
+// Конвертируем наши элементы меню в формат, понятный компоненту Menubar
+const menubarItems = computed(() =>
+    menuItems.value.map(item => ({
+      label: item.label,
+      icon: item.icon,
+      command: () => router.push({ name: item.route })
+    }))
+)
 
 watchEffect(() => {
   const handleScroll = () => {
     scrolled.value = window.scrollY > 50
   }
-  
+
   window.addEventListener('scroll', handleScroll)
-  
+
   return () => {
     window.removeEventListener('scroll', handleScroll)
   }
@@ -70,10 +80,16 @@ const closeMobileMenu = () => {
   isMobileMenuOpen.value = false
 }
 
+const navigateTo = (routeName) => {
+  router.push({ name: routeName })
+  closeMobileMenu()
+}
+
 const handleLogout = async () => {
   try {
     await signOut(auth)
     router.push({ name: 'login' })
+    closeMobileMenu()
   } catch (error) {
     console.error('Logout error:', error)
   }
@@ -81,9 +97,9 @@ const handleLogout = async () => {
 </script>
 
 <template>
-  <header 
-    :class="[
-      'fixed w-full z-50 transition-all duration-300', 
+  <header
+      :class="[
+      'fixed w-full z-50 transition-all duration-300',
       scrolled ? 'bg-white shadow-md py-2' : 'bg-transparent py-4'
     ]"
   >
@@ -92,90 +108,123 @@ const handleLogout = async () => {
       <router-link to="/" class="flex items-center" @click="closeMobileMenu">
         <span class="text-xl font-bold text-primary-600">IT Компанія</span>
       </router-link>
-      
+
       <!-- Desktop Menu -->
       <div class="hidden lg:block">
-        <Menubar :model="menuItems" class="border-none bg-transparent" />
+        <Menubar :model="menubarItems" class="border-none bg-transparent" />
       </div>
-      
+
       <!-- Language Switcher & Auth Buttons -->
       <div class="hidden lg:flex items-center space-x-4">
-        <SelectButton v-model="locale" :options="languages" optionLabel="name" optionValue="value" />
+        <!-- Обновленный дизайн переключателя языка -->
+        <div class="flex border rounded-lg overflow-hidden">
+          <button
+              v-for="lang in languages"
+              :key="lang.value"
+              :class="[
+              'px-3 py-1 transition-colors',
+              locale === lang.value
+                ? 'bg-primary-500 text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+            ]"
+              @click="locale = lang.value"
+          >
+            {{ lang.name }}
+          </button>
+        </div>
+
         <template v-if="!auth.currentUser">
-          <Button 
-            label="Увійти" 
-            icon="pi pi-sign-in" 
-            class="p-button-outlined"
-            @click="router.push({ name: 'login' })"
+          <Button
+              label="Увійти"
+              icon="pi pi-sign-in"
+              class="p-button-outlined"
+              @click="router.push({ name: 'login' })"
           />
-          <Button 
-            label="Реєстрація" 
-            icon="pi pi-user-plus" 
-            @click="router.push({ name: 'register' })"
+          <Button
+              label="Реєстрація"
+              icon="pi pi-user-plus"
+              @click="router.push({ name: 'register' })"
           />
         </template>
         <template v-else>
-          <Button 
-            label="Вийти" 
-            icon="pi pi-sign-out" 
-            class="p-button-outlined"
-            @click="handleLogout"
+          <Button
+              label="Вийти"
+              icon="pi pi-sign-out"
+              class="p-button-outlined"
+              @click="handleLogout"
           />
         </template>
       </div>
-      
+
       <!-- Mobile Menu Button -->
       <div class="lg:hidden flex items-center space-x-2">
-        <SelectButton v-model="locale" :options="languages" optionLabel="name" optionValue="value" />
+        <!-- Обновленный дизайн переключателя языка для мобильных -->
+        <div class="flex border rounded-lg overflow-hidden">
+          <button
+              v-for="lang in languages"
+              :key="lang.value"
+              :class="[
+              'px-2 py-1 text-sm transition-colors',
+              locale === lang.value
+                ? 'bg-primary-500 text-white'
+                : 'bg-white text-gray-700'
+            ]"
+              @click="locale = lang.value"
+          >
+            {{ lang.name }}
+          </button>
+        </div>
+
         <button @click="toggleMobileMenu" class="p-2 rounded-md text-gray-700">
           <span class="sr-only">Open menu</span>
           <i :class="[isMobileMenuOpen ? 'pi pi-times' : 'pi pi-bars', 'text-2xl']"></i>
         </button>
       </div>
     </div>
-    
-    <!-- Mobile Menu -->
-    <div 
-      v-if="isMobileMenuOpen" 
-      class="lg:hidden absolute top-full left-0 w-full bg-white shadow-lg py-4 px-4 transition-all duration-300 ease-in-out z-50"
+
+    <!-- Mobile Menu - исправлено для корректной навигации -->
+    <div
+        v-if="isMobileMenuOpen"
+        class="lg:hidden absolute top-full left-0 w-full bg-white shadow-lg py-4 px-4 transition-all duration-300 ease-in-out z-50"
     >
       <nav class="flex flex-col space-y-4">
-        <router-link 
-          v-for="item in menuItems" 
-          :key="item.label" 
-          :to="{ name: item.command().name }" 
-          class="px-4 py-2 rounded-md hover:bg-gray-100 flex items-center"
-          @click="closeMobileMenu"
+        <a
+            v-for="item in menuItems"
+            :key="item.label"
+            href="#"
+            class="px-4 py-2 rounded-md hover:bg-gray-100 flex items-center"
+            @click.prevent="navigateTo(item.route)"
         >
           <i :class="[item.icon, 'mr-2']"></i>
           {{ item.label }}
-        </router-link>
+        </a>
+
         <template v-if="!auth.currentUser">
-          <Button 
-            label="Увійти" 
-            icon="pi pi-sign-in" 
-            class="p-button-outlined w-full"
-            @click="() => { router.push({ name: 'login' }); closeMobileMenu(); }"
+          <Button
+              label="Увійти"
+              icon="pi pi-sign-in"
+              class="p-button-outlined w-full"
+              @click="() => { router.push({ name: 'login' }); closeMobileMenu(); }"
           />
-          <Button 
-            label="Реєстрація" 
-            icon="pi pi-user-plus" 
-            class="w-full"
-            @click="() => { router.push({ name: 'register' }); closeMobileMenu(); }"
+          <Button
+              label="Реєстрація"
+              icon="pi pi-user-plus"
+              class="w-full"
+              @click="() => { router.push({ name: 'register' }); closeMobileMenu(); }"
           />
         </template>
         <template v-else>
-          <Button 
-            label="Вийти" 
-            icon="pi pi-sign-out" 
-            class="p-button-outlined w-full"
-            @click="() => { handleLogout(); closeMobileMenu(); }"
+          <Button
+              label="Вийти"
+              icon="pi pi-sign-out"
+              class="p-button-outlined w-full"
+              @click="handleLogout"
           />
         </template>
       </nav>
     </div>
   </header>
-  
+
   <!-- Spacer for fixed header -->
   <div :class="['h-16', scrolled ? 'h-16' : 'h-20']"></div>
 </template>
