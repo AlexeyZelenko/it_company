@@ -14,7 +14,8 @@ const uk = {
     share: 'Поділитися',
     minutesToRead: '{n} хв. читання',
     views: 'Переглядів: {n}',
-    footerCopyright: '© {year} IT Компанія. Всі права захищені.'
+    footerCopyright: '© {year} IT Компанія. Всі права захищені.',
+    like: 'Подобається',
   },
   home: {
     hero: {
@@ -135,7 +136,8 @@ const en = {
     share: 'Share',
     minutesToRead: '{n} min read',
     views: 'Views: {n}',
-    footerCopyright: '© {year} IT Company. All rights reserved.'
+    footerCopyright: '© {year} IT Company. All rights reserved.',
+    like: 'Like',
   },
   home: {
     hero: {

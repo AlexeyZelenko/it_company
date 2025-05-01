@@ -5,49 +5,52 @@ import { useI18n } from 'vue-i18n';
 import Button from 'primevue/button';
 import Card from 'primevue/card';
 import { marked } from 'marked';
-import { collection, query, where, getDocs, updateDoc, increment, doc, QuerySnapshot, DocumentData, Timestamp } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  updateDoc,
+  increment,
+  doc,
+  DocumentData,
+  QuerySnapshot,
+  Timestamp,
+} from 'firebase/firestore';
 import { db } from '@/firebase';
 
+// Визначаємо інтерфейс для поста блогу
 interface BlogPost {
-  id?: string;
+  id: string;
   title: string;
   shortDescription: string;
   content?: string;
   image?: string;
-  publishDate: Date | Timestamp;
-  slug?: string;
-  tags?: string[];
-  readingTime?: number;
+  publishDate: Timestamp;
+  formattedDate?: string;
   viewCount?: number;
   likes?: number;
-  formattedDate?: string;
+  tags?: string[];
 }
 
-interface ShareUrls {
-  facebook?: string;
-  twitter?: string;
-  linkedin?: string;
-  telegram?: string;
-}
-
-// Composables
+// Використовуємо composables для кращої організації коду
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
 
-// State
+// Стан компонента
 const post = ref<BlogPost | null>(null);
-const loading = ref<boolean>(true);
-const error = ref<boolean>(false);
-const likes = ref<number>(0);
-const hasLiked = ref<boolean>(false);
+const loading = ref(true);
+const error = ref(false);
+const likes = ref<any>(0);
+const hasLiked = ref<any>(false);
 
-// Cache
-const CACHE_TTL = 60 * 5 * 1000; // 5 minutes
+// Кэширование в localStorage
+const CACHE_TTL = 60 * 5 * 1000; // 5 минут
 const POST_CACHE_KEY = `blog_post_${route.params.slug}`;
 const cachedPost = localStorage.getItem(POST_CACHE_KEY);
 
-// Computed properties
+// Вычисляемые свойства
 const readingTime = computed<number>(() => {
   if (!post.value?.content) return 0;
   const words = post.value.content.trim().split(/\s+/).length;
@@ -58,13 +61,14 @@ const formattedContent = computed<string>(() => {
   if (!post.value?.content) return '';
   try {
     return marked(post.value.content);
-  } catch (err: any) {
+  } catch (err) {
     console.error('Error formatting content:', err);
     return post.value.content || '';
   }
 });
 
-const shareUrls = computed<ShareUrls>(() => {
+// URLs для шеринга в соцсетях - вынесено в отдельную функцию
+const shareUrls: any = computed(() => {
   if (!post.value) return {};
 
   const url = window.location.href;
@@ -79,8 +83,8 @@ const shareUrls = computed<ShareUrls>(() => {
   };
 });
 
-// Meta tags
-const updateMeta = (title: string = 'Блог | IT Компанія', description: string = 'Блог IT Компанії') => {
+// Правильное управление мета-тегами без useMeta
+const updateMeta = (title = 'Блог | IT Компанія', description = 'Блог IT Компанії') => {
   document.title = title;
   const descriptionMeta = document.querySelector('meta[name="description"]');
   if (descriptionMeta) {
@@ -93,17 +97,19 @@ const updateMeta = (title: string = 'Блог | IT Компанія', descriptio
   }
 };
 
+// Обновляем мета-информацию при изменении поста
 watchEffect(() => {
   if (post.value) {
     updateMeta(`${post.value.title} | IT Компанія`, post.value.shortDescription);
   } else {
-    updateMeta();
+    updateMeta(); // Восстанавливаем значения по умолчанию
   }
 });
 
-// Data fetching
+// Асинхронно загружаем данные поста
 onMounted(async () => {
   try {
+    // Проверяем кэш сначала
     if (cachedPost) {
       try {
         const { data, timestamp } = JSON.parse(cachedPost) as { data: BlogPost; timestamp: number };
@@ -112,57 +118,62 @@ onMounted(async () => {
           likes.value = data.likes || 0;
           checkUserLike();
           loading.value = false;
-          incrementViewCount(data.id).catch(err => console.error('Background view increment failed:', err));
+
+          // Обновляем счетчик просмотров в фоне (но не возвращаемся раньше времени)
+          incrementViewCount().catch((err) => console.error('Background view increment failed:', err));
           return;
         }
-      } catch (e: any) {
+      } catch (e) {
         console.log('Cache parsing error:', e);
       }
     }
+
     await fetchPost();
-  } catch (err: any) {
+  } catch (err) {
     console.error('Error in component initialization:', err);
     error.value = true;
     loading.value = false;
   }
 });
 
+// Функции для работы с данными
 async function fetchPost() {
   try {
+    // Используем конкретный docId, если он известен, избегая запроса с where
     const slug = route.params.slug;
-    const postsQuery = query(
-        collection(db, 'blog'),
-        where('slug', '==', slug)
-    );
+    const postsQuery = query(collection(db, 'blog'), where('slug', '==', slug));
     const querySnapshot: QuerySnapshot<DocumentData> = await getDocs(postsQuery);
 
     if (!querySnapshot.empty) {
       const postDoc = querySnapshot.docs[0];
-      const postData = postDoc.data() as Omit<BlogPost, 'id' | 'formattedDate'>;
+      const postData = postDoc.data() as Omit<BlogPost, 'id' | 'formattedDate'> & { publishDate: Timestamp };
 
       post.value = {
         id: postDoc.id,
         ...postData,
-        formattedDate: (postData.publishDate as Timestamp).toDate().toLocaleDateString('uk-UA', {
+        formattedDate: postData.publishDate.toDate().toLocaleDateString('uk-UA', {
           day: '2-digit',
           month: 'long',
           year: 'numeric',
         }),
-      } as BlogPost;
+      };
 
-      incrementViewCount(postDoc.id);
+      // Инкрементируем счетчик просмотров
+      incrementViewCount(postDoc);
 
+      // Сохраняем в кэш
       localStorage.setItem(POST_CACHE_KEY, JSON.stringify({
         data: post.value,
         timestamp: Date.now(),
       }));
 
+      // Проверяем, лайкнул ли пользователь пост
       likes.value = postData.likes || 0;
       checkUserLike();
     } else {
       error.value = true;
     }
-  } catch (err: any) {
+  } catch (err) {
     console.error('Error fetching post:', err);
     error.value = true;
   } finally {
@@ -170,27 +181,45 @@ async function fetchPost() {
   }
 }
 
-async function incrementViewCount(postId: string | undefined) {
-  if (!postId) return;
+async function incrementViewCount(postDoc: any = null) {
   try {
-    const postRef = doc(db, 'blog', postId);
-    await updateDoc(postRef, {
+    // Проверяем, есть ли уже id документа в кэше
+    if (post.value?.id) {
+      const postRef = doc(db, 'blog', post.value.id);
+      await updateDoc(postRef, {
+        viewCount: increment(1),
+      });
+      return;
+    }
+
+    // Если нет, делаем запрос
+    if (!postDoc) {
+      const postsQuery = query(collection(db, 'blog'), where('slug', '==', route.params.slug));
+      const querySnapshot: QuerySnapshot<DocumentData> = await getDocs(postsQuery);
+      if (!querySnapshot.empty) {
+        postDoc = querySnapshot.docs[0];
+      } else {
+        return;
+      }
+    }
+
+    await updateDoc(postDoc.ref, {
       viewCount: increment(1),
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error('Error incrementing view count:', err);
+    // Не прокидываем ошибку дальше, так как это некритичная операция
   }
 }
 
 function checkUserLike() {
-  if (!post.value?.id) return;
   const likedPosts = JSON.parse(localStorage.getItem('likedPosts') || '[]') as string[];
-  hasLiked.value = likedPosts.includes(post.value.id);
+  hasLiked.value = post.value && likedPosts.includes(post.value.id);
 }
 
-// User actions
+// Обработчики действий пользователя
 const handleLike = async () => {
-  if (!post.value?.id) return;
+  if (!post.value) return;
 
   try {
     const postId = post.value.id;
@@ -217,30 +246,26 @@ const handleLike = async () => {
 
     localStorage.setItem('likedPosts', JSON.stringify(likedPosts));
 
+    // Оновлюємо кеш
     if (cachedPost) {
       try {
         const cachedData = JSON.parse(cachedPost) as { data: BlogPost; timestamp: number };
-        if (cachedData.data) {
-          cachedData.data.likes = likes.value;
-          localStorage.setItem(POST_CACHE_KEY, JSON.stringify(cachedData));
-        }
-      } catch (e: any) {
+        cachedData.data.likes = likes.value;
+        localStorage.setItem(POST_CACHE_KEY, JSON.stringify(cachedData));
+      } catch (e) {
         console.error('Error updating cache:', e);
       }
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error liking/unliking post:', error);
   }
 };
 
-const share = (platform: keyof ShareUrls) => {
+const share = (platform: keyof ReturnType<any>) => {
   if (!post.value || !shareUrls.value[platform]) return;
+
   window.open(shareUrls.value[platform], '_blank');
 };
-
-const currentLikes = computed(() => {
-  return String(post.value?.likes) || '0';
-});
 </script>
 
 <template>
@@ -266,8 +291,8 @@ const currentLikes = computed(() => {
 
         <img
             v-if="post?.image"
-            :src="post.image"
-            :alt="post.title"
+            :src="post?.image"
+            :alt="post?.title"
             class="w-full h-96 object-cover rounded-lg shadow-lg mb-8"
             loading="lazy"
         >
@@ -277,13 +302,13 @@ const currentLikes = computed(() => {
           <template #content>
             <Button
                 type="button"
-                label="Подобається"
+                :label="t('common.like')"
                 severity="secondary"
                 rounded
                 class="p-button-outlined"
                 :class="hasLiked ? 'p-button-danger' : 'p-button-secondary'"
                 :icon="hasLiked ? 'pi pi-heart-fill' : 'pi pi-heart'"
-                :badge="currentLikes"
+                :badge="likes"
                 badgeSeverity="secondary"
                 @click="handleLike"
             />
@@ -292,8 +317,7 @@ const currentLikes = computed(() => {
             <div class="flex gap-2">
               <Button
                   icon="pi pi-facebook"
-                  severity="info"
-                  raised
+                  severity="info" raised
                   rounded
                   outlined
                   @click="share('facebook')"
@@ -301,9 +325,7 @@ const currentLikes = computed(() => {
               />
               <Button
                   icon="pi pi-twitter"
-                  severity="secondary"
-                  variant="text"
-                  raised
+                  severity="secondary" variant="text" raised
                   rounded
                   outlined
                   @click="share('twitter')"
@@ -311,9 +333,7 @@ const currentLikes = computed(() => {
               />
               <Button
                   icon="pi pi-linkedin"
-                  severity="secondary"
-                  variant="text"
-                  raised
+                  severity="secondary" variant="text" raised
                   rounded
                   outlined
                   @click="share('linkedin')"
@@ -321,9 +341,7 @@ const currentLikes = computed(() => {
               />
               <Button
                   icon="pi pi-telegram"
-                  severity="secondary"
-                  variant="text"
-                  raised
+                  severity="secondary" variant="text" raised
                   rounded
                   outlined
                   @click="share('telegram')"
@@ -359,7 +377,7 @@ const currentLikes = computed(() => {
         Вибачте, але статтю, яку ви шукаєте, не знайдено.
       </p>
       <Button
-          label="Повернутися до блогу"
+          :label="t('blog.postNotFound.back')"
           icon="pi pi-arrow-left"
           @click="router.push({ name: 'blog' })"
       />
@@ -370,7 +388,7 @@ const currentLikes = computed(() => {
     <div class="container-custom">
       <div class="flex flex-col items-center">
         <i class="pi pi-spinner animate-spin text-4xl text-primary-500 mb-4"></i>
-        <p>Завантаження статті...</p>
+        <p>{{ t('common.loadingPost') }}</p>
       </div>
     </div>
   </div>
