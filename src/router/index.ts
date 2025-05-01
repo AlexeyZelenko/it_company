@@ -129,6 +129,7 @@ const router = createRouter({
     }
   ],
   scrollBehavior(to, from, savedPosition) {
+    console.log(`Navigating from ${from} to ${to}`)
     if (savedPosition) {
       return savedPosition
     } else {

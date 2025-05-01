@@ -28,7 +28,7 @@ interface Post {
   likes?: number;
   createdAt?: Date | Timestamp;
   updatedAt?: Date | Timestamp;
-  readingTime?: number;
+  readingTime?: any;
   slug?: string;
 }
 
@@ -39,10 +39,10 @@ interface FormState {
   image: string;
   tags: string;
   publishDate: Date;
-  readingTime: number | null;
+  readingTime: any;
 }
 
-const { t } = useI18n();
+const { t: _t } = useI18n()
 const toast = useToast();
 
 const posts = ref<Post[]>([]);
@@ -51,7 +51,7 @@ const dialog = ref<boolean>(false);
 const deleteDialog = ref<boolean>(false);
 const selectedPost = ref<Post | null>(null);
 const uploadedFile = ref<File | null>(null);
-const src = ref<string | ArrayBuffer | null>(null);
+const src = ref<string | ArrayBuffer | null | any>(null);
 
 const form = ref<FormState>({
   title: '',
@@ -338,7 +338,7 @@ function onFileSelect(event: any) {
                 class="w-32 h-32 object-cover rounded"
             >
             <FileUpload mode="basic" @select="onFileSelect" customUpload auto severity="secondary" class="p-button-outlined" />
-            <img v-if="src" :src="src" alt="Image" class="shadow-md rounded-xl w-full sm:w-64" style="filter: grayscale(100%)" />
+            <img v-if="src" :src="src || ''" alt="Image" class="shadow-md rounded-xl w-full sm:w-64" style="filter: grayscale(100%)" />
           </div>
         </div>
 

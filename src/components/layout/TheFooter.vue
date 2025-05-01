@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
-const router = useRouter()
 const { t } = useI18n()
 
 const currentYear = computed(() => new Date().getFullYear())

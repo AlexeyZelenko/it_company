@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import Button from 'primevue/button';
 import Menubar from 'primevue/menubar';
-import { signOut } from 'firebase/auth';
+import { signOut, User } from 'firebase/auth';
 import { auth } from '@/firebase';
 import { useToast } from 'primevue/usetoast';
 
@@ -20,6 +20,7 @@ interface LanguageOption {
   value: string;
 }
 
+const currentUser = computed<User | null>(() => auth.currentUser);
 const toast = useToast();
 const { t, locale } = useI18n();
 const router = useRouter();

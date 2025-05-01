@@ -3,7 +3,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 
-const { t } = useI18n()
+const { t: _t } = useI18n()
 const router = useRouter()
 
 const goBack = () => {

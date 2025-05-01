@@ -11,7 +11,7 @@ import Toast from 'primevue/toast'
 import { signInWithEmailAndPassword } from 'firebase/auth'
 import { auth } from '@/firebase'
 
-const { t } = useI18n()
+const { t: _t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()

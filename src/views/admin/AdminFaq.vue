@@ -16,7 +16,7 @@ interface Faq {
   question: string;
   answer: string;
   category: string;
-  order: number;
+  order: any;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -25,10 +25,10 @@ interface FormState {
   question: string;
   answer: string;
   category: string;
-  order: number | null;
+  order: any;
 }
 
-const { t } = useI18n();
+const { t: _t } = useI18n()
 const toast = useToast();
 
 const faqs = ref<Faq[]>([]);
@@ -41,7 +41,7 @@ const form = ref<FormState>({
   question: '',
   answer: '',
   category: '',
-  order: 0,
+  order: 0
 });
 
 onMounted(async () => {

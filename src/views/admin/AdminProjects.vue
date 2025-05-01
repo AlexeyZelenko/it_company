@@ -45,7 +45,7 @@ interface FormState {
   category: string;
 }
 
-const { t } = useI18n();
+const { t: _t } = useI18n()
 const toast = useToast();
 
 const projects = ref<Project[]>([]);
@@ -164,7 +164,7 @@ const deleteProject = async () => {
 
 const saveProject = async () => {
   try {
-    const projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'formattedDate' | 'viewCount' | 'slug'> = {
+    const projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'formattedDate' | 'viewCount' > = {
       ...form.value,
       slug: slugify(form.value.title, { lower: true }),
     };

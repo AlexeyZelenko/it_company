@@ -7,7 +7,6 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import { collection, getDocs, query, orderBy, limit, getCountFromServer, DocumentData, QuerySnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase/index.ts';
-import { useRouter } from 'vue-router';
 
 interface Stats {
   services: number;
@@ -26,7 +25,6 @@ interface Message {
 }
 
 const { t } = useI18n();
-const router = useRouter();
 const loading = ref<boolean>(true);
 const stats = ref<Stats>({
   services: 0,
