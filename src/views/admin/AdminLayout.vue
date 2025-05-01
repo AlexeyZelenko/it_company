@@ -1,80 +1,86 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
-import { useToast } from 'primevue/usetoast'
-import Menubar from 'primevue/menubar'
-import Toast from 'primevue/toast'
-import { onAuthStateChanged, signOut } from 'firebase/auth'
-import { auth } from '@/firebase'
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
+import { useToast } from 'primevue/usetoast';
+import Menubar from 'primevue/menubar';
+import Toast from 'primevue/toast';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { auth } from '@/firebase';
 
-const { t } = useI18n()
-const router = useRouter()
-const toast = useToast()
-const currentUser = ref(null)
+interface MenuItem {
+  label: string;
+  icon?: string;
+  command?: () => void;
+}
 
-const menuItems = [
+const { t } = useI18n();
+const router = useRouter();
+const toast = useToast();
+const currentUser = ref<User | null>(null);
+
+const menuItems = ref<MenuItem[]>([
   {
     label: t('admin.dashboard.title'),
     icon: 'pi pi-home',
-    command: () => router.push({ name: 'admin-dashboard' })
+    command: () => router.push({ name: 'admin-dashboard' }),
   },
   {
     label: t('admin.dashboard.services'),
     icon: 'pi pi-cog',
-    command: () => router.push({ name: 'admin-services' })
+    command: () => router.push({ name: 'admin-services' }),
   },
   {
     label: t('admin.dashboard.blogPosts'),
     icon: 'pi pi-book',
-    command: () => router.push({ name: 'admin-blog' })
+    command: () => router.push({ name: 'admin-blog' }),
   },
   {
     label: t('admin.dashboard.faqItems'),
     icon: 'pi pi-question-circle',
-    command: () => router.push({ name: 'admin-faq' })
+    command: () => router.push({ name: 'admin-faq' }),
   },
   {
     label: 'Проекти',
     icon: 'pi pi-briefcase',
-    command: () => router.push({ name: 'admin-projects' })
+    command: () => router.push({ name: 'admin-projects' }),
   },
   {
     label: t('admin.common.logout'),
     icon: 'pi pi-sign-out',
-    command: handleLogout
-  }
-]
+    command: handleLogout,
+  },
+]);
 
 onMounted(() => {
   const unsubscribe = onAuthStateChanged(auth, (user) => {
-    currentUser.value = user
+    currentUser.value = user;
     if (!user) {
-      router.replace({ name: 'admin-login' })
+      router.replace({ name: 'login' });
     }
-  })
-  
-  return () => unsubscribe()
-})
+  });
+
+  return () => unsubscribe();
+});
 
 async function handleLogout() {
   try {
-    await signOut(auth)
-    router.replace({ name: 'admin-login' })
+    await signOut(auth);
+    router.replace({ name: 'login' });
     toast.add({
       severity: 'success',
       summary: 'Успішний вихід',
       detail: 'Ви успішно вийшли з адмін-панелі',
-      life: 3000
-    })
-  } catch (error) {
-    console.error('Logout error:', error)
+      life: 3000,
+    });
+  } catch (error: any) {
+    console.error('Logout error:', error);
     toast.add({
       severity: 'error',
       summary: 'Помилка',
       detail: 'Помилка при виході з адмін-панелі',
-      life: 3000
-    })
+      life: 3000,
+    });
   }
 }
 </script>
@@ -82,7 +88,7 @@ async function handleLogout() {
 <template>
   <div class="min-h-screen bg-gray-100">
     <Toast />
-    
+
     <div class="bg-white shadow-md">
       <div class="container-custom py-2">
         <Menubar :model="menuItems">
@@ -100,7 +106,7 @@ async function handleLogout() {
         </Menubar>
       </div>
     </div>
-    
+
     <main class="container-custom py-8">
       <router-view />
     </main>

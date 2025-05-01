@@ -1,22 +1,40 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import Card from 'primevue/card'
-import Chart from 'primevue/chart'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
-import { collection, getDocs, query, orderBy, limit, getCountFromServer } from 'firebase/firestore'
-import { db } from '@/firebase'
+import { ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
+import Card from 'primevue/card';
+import Chart from 'primevue/chart';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import { collection, getDocs, query, orderBy, limit, getCountFromServer, DocumentData, QuerySnapshot, Timestamp } from 'firebase/firestore';
+import { db } from '@/firebase/index.ts';
+import { useRouter } from 'vue-router';
 
-const { t } = useI18n()
-const loading = ref(true)
-const stats = ref({
+interface Stats {
+  services: number;
+  blogPosts: number;
+  faqItems: number;
+  messages: number;
+}
+
+interface Message {
+  id?: string;
+  name: string;
+  email: string;
+  message: string;
+  createdAt: Date | Timestamp;
+  status: 'new' | 'read' | 'responded' | string;
+}
+
+const { t } = useI18n();
+const router = useRouter();
+const loading = ref<boolean>(true);
+const stats = ref<Stats>({
   services: 0,
   blogPosts: 0,
   faqItems: 0,
-  messages: 0
-})
-const recentMessages = ref([])
+  messages: 0,
+});
+const recentMessages = ref<Message[]>([]);
 
 // Chart data
 const chartData = ref({
@@ -26,125 +44,136 @@ const chartData = ref({
       label: 'Перегляди сторінок',
       backgroundColor: 'rgba(99, 102, 241, 0.2)',
       borderColor: 'rgba(99, 102, 241, 1)',
-      data: [65, 59, 80, 81, 56, 55, 40]
+      data: [65, 59, 80, 81, 56, 55, 40],
     },
     {
       label: 'Унікальні відвідувачі',
       backgroundColor: 'rgba(20, 184, 166, 0.2)',
       borderColor: 'rgba(20, 184, 166, 1)',
-      data: [28, 48, 40, 19, 86, 27, 90]
-    }
-  ]
-})
+      data: [28, 48, 40, 19, 86, 27, 90],
+    },
+  ],
+});
 
 const chartOptions = {
   responsive: true,
-  maintainAspectRatio: false
-}
+  maintainAspectRatio: false,
+};
 
 onMounted(async () => {
   try {
     // Fetch counts from Firestore
-    const servicesCount = await getCountFromServer(collection(db, 'services'))
-    const blogCount = await getCountFromServer(collection(db, 'blog'))
-    const faqCount = await getCountFromServer(collection(db, 'faq'))
-    const messagesCount = await getCountFromServer(collection(db, 'messages'))
-    
+    const servicesCount = await getCountFromServer(collection(db, 'services'));
+    const blogCount = await getCountFromServer(collection(db, 'blog'));
+    const faqCount = await getCountFromServer(collection(db, 'faq'));
+    const messagesCount = await getCountFromServer(collection(db, 'messages'));
+
     stats.value = {
       services: servicesCount.data().count,
       blogPosts: blogCount.data().count,
       faqItems: faqCount.data().count,
-      messages: messagesCount.data().count
-    }
-    
+      messages: messagesCount.data().count,
+    };
+
     // Fetch recent messages
     const messagesQuery = query(
-      collection(db, 'messages'),
-      orderBy('createdAt', 'desc'),
-      limit(5)
-    )
-    const messagesSnapshot = await getDocs(messagesQuery)
-    recentMessages.value = messagesSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate() || new Date()
-    }))
-  } catch (error) {
-    console.error('Error fetching dashboard data:', error)
+        collection(db, 'messages'),
+        orderBy('createdAt', 'desc'),
+        limit(5)
+    );
+    const messagesSnapshot: QuerySnapshot<DocumentData> = await getDocs(messagesQuery);
+    recentMessages.value = messagesSnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
+      } as Message;
+    });
+  } catch (error: any) {
+    console.error('Error fetching dashboard data:', error);
     // Set fallback data if Firebase fetch fails
     stats.value = {
       services: 4,
       blogPosts: 12,
       faqItems: 15,
-      messages: 8
-    }
-    
+      messages: 8,
+    };
+
     recentMessages.value = [
       {
         id: '1',
         name: 'Олександр Петренко',
         email: 'oleksandr@example.com',
         message: 'Цікавлять послуги веб-розробки.',
-        createdAt: new Date('2023-05-15'),
-        status: 'new'
+        createdAt: new Date('2025-05-15'),
+        status: 'new',
       },
       {
         id: '2',
         name: 'Марія Коваленко',
         email: 'maria@example.com',
         message: 'Хочу дізнатися більше про розробку мобільних додатків.',
-        createdAt: new Date('2023-05-14'),
-        status: 'read'
+        createdAt: new Date('2025-05-14'),
+        status: 'read',
       },
       {
         id: '3',
         name: 'Іван Сидоренко',
         email: 'ivan@example.com',
         message: 'Питання щодо вартості послуг.',
-        createdAt: new Date('2023-05-12'),
-        status: 'responded'
-      }
-    ]
+        createdAt: new Date('2025-05-12'),
+        status: 'responded',
+      },
+    ];
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-})
+});
 
-const formatDate = (value) => {
-  if (!value) return ''
+const formatDate = (value: Date | Timestamp): string => {
+  if (!value) return '';
+  const date = value instanceof Timestamp ? value.toDate() : value;
   return new Intl.DateTimeFormat('uk-UA', {
     year: 'numeric',
     month: 'short',
     day: '2-digit',
     hour: '2-digit',
-    minute: '2-digit'
-  }).format(value)
-}
+    minute: '2-digit',
+  }).format(date);
+};
 
-const getStatusClass = (status) => {
+const getStatusClass = (status: string): string => {
   switch (status) {
-    case 'new': return 'bg-blue-100 text-blue-800'
-    case 'read': return 'bg-yellow-100 text-yellow-800'
-    case 'responded': return 'bg-green-100 text-green-800'
-    default: return 'bg-gray-100 text-gray-800'
+    case 'new':
+      return 'bg-blue-100 text-blue-800';
+    case 'read':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'responded':
+      return 'bg-green-100 text-green-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
   }
-}
+};
 
-const getStatusLabel = (status) => {
+const getStatusLabel = (status: string): string => {
   switch (status) {
-    case 'new': return 'Новий'
-    case 'read': return 'Прочитано'
-    case 'responded': return 'Відповідь надіслано'
-    default: return status
+    case 'new':
+      return 'Новий';
+    case 'read':
+      return 'Прочитано';
+    case 'responded':
+      return 'Відповідь надіслано';
+    default:
+      return status;
   }
-}
+};
 </script>
 
 <template>
   <div>
     <h1 class="text-3xl font-bold text-gray-900 mb-6">{{ t('admin.dashboard.welcome') }}</h1>
-    
-    <!-- Stats cards -->
+
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
       <Card class="shadow-sm">
         <template #title>
@@ -157,7 +186,7 @@ const getStatusLabel = (status) => {
           <div class="text-3xl font-bold">{{ stats.services }}</div>
         </template>
       </Card>
-      
+
       <Card class="shadow-sm">
         <template #title>
           <div class="flex items-center">
@@ -169,7 +198,7 @@ const getStatusLabel = (status) => {
           <div class="text-3xl font-bold">{{ stats.blogPosts }}</div>
         </template>
       </Card>
-      
+
       <Card class="shadow-sm">
         <template #title>
           <div class="flex items-center">
@@ -181,7 +210,7 @@ const getStatusLabel = (status) => {
           <div class="text-3xl font-bold">{{ stats.faqItems }}</div>
         </template>
       </Card>
-      
+
       <Card class="shadow-sm">
         <template #title>
           <div class="flex items-center">
@@ -194,10 +223,8 @@ const getStatusLabel = (status) => {
         </template>
       </Card>
     </div>
-    
-    <!-- Chart & Recent Messages -->
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <!-- Chart -->
       <Card class="shadow-sm lg:col-span-2">
         <template #title>
           <div class="flex items-center">
@@ -211,8 +238,7 @@ const getStatusLabel = (status) => {
           </div>
         </template>
       </Card>
-      
-      <!-- Recent Messages -->
+
       <Card class="shadow-sm">
         <template #title>
           <div class="flex items-center justify-between">
@@ -226,12 +252,12 @@ const getStatusLabel = (status) => {
           </div>
         </template>
         <template #content>
-          <DataTable 
-            :value="recentMessages" 
-            stripedRows 
-            :loading="loading" 
-            responsiveLayout="scroll"
-            class="p-datatable-sm"
+          <DataTable
+              :value="recentMessages"
+              stripedRows
+              :loading="loading"
+              responsiveLayout="scroll"
+              class="p-datatable-sm"
           >
             <Column field="name" header="Ім'я">
               <template #body="{ data }">

@@ -1,226 +1,271 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useToast } from 'primevue/usetoast'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
-import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
-import InputText from 'primevue/inputtext'
-import Textarea from 'primevue/textarea'
-import Editor from 'primevue/editor'
-import FileUpload from 'primevue/fileupload'
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, deleteField } from 'firebase/firestore'
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
-import { db, storage } from '@/firebase'
-import slugify from 'slugify'
+import { ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useToast } from 'primevue/usetoast';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import Button from 'primevue/button';
+import Dialog from 'primevue/dialog';
+import InputText from 'primevue/inputtext';
+import Textarea from 'primevue/textarea';
+import Editor from 'primevue/editor';
+import FileUpload from 'primevue/fileupload';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, deleteField, DocumentData, QuerySnapshot, Timestamp } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, storage } from '@/firebase';
+import slugify from 'slugify';
 import { PrimeIcons } from 'primevue/api';
 import Dropdown from 'primevue/dropdown';
 
-const { t } = useI18n()
-const toast = useToast()
+interface Service {
+  id?: string;
+  title: string;
+  description: string;
+  fullDescription: string;
+  image?: string;
+  icon?: string;
+  features: string[];
+  slug?: string;
+  createdAt?: Date | Timestamp;
+  updatedAt?: Date | Timestamp;
+}
 
-const services = ref([])
-const loading = ref(true)
-const dialog = ref(false)
-const deleteDialog = ref(false)
-const selectedService = ref(null)
-const uploadedFile = ref(null)
+interface FormState {
+  title: string;
+  description: string;
+  fullDescription: string;
+  image: string;
+  icon: string | null;
+  features: string;
+  slug: string;
+}
 
-const form = ref({
+interface IconOption {
+  name: string;
+  value: string;
+}
+
+const { t } = useI18n();
+const toast = useToast();
+
+const services = ref<Service[]>([]);
+const loading = ref<boolean>(true);
+const dialog = ref<boolean>(false);
+const deleteDialog = ref<boolean>(false);
+const selectedService = ref<Service | null>(null);
+const uploadedFile = ref<File | null>(null);
+const src = ref<string | ArrayBuffer | null>(null);
+const primeIconsList = ref<IconOption[]>([]);
+
+const form = ref<FormState>({
   title: '',
   description: '',
   fullDescription: '',
   image: '',
-  icon: '',
+  icon: null,
   features: '',
-  slug: ''
-})
+  slug: '',
+});
 
 onMounted(async () => {
-  await loadServices()
-})
+  primeIconsList.value = Object.values(PrimeIcons).map(iconName => ({ name: iconName, value: iconName }));
+  await loadServices();
+});
 
 const loadServices = async () => {
   try {
-    const servicesSnapshot = await getDocs(collection(db, 'services'))
+    const servicesSnapshot: QuerySnapshot<DocumentData> = await getDocs(collection(db, 'services'));
     services.value = servicesSnapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data()
-    }))
-  } catch (error) {
-    console.error('Error loading services:', error)
+      ...doc.data(),
+      features: (doc.data().features as string[]) || [],
+    })) as Service[];
+  } catch (error: any) {
+    console.error('Error loading services:', error);
     toast.add({
       severity: 'error',
       summary: 'Помилка',
       detail: 'Не вдалося завантажити послуги',
-      life: 3000
-    })
+      life: 3000,
+    });
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 const openNew = () => {
-  selectedService.value = null
+  selectedService.value = null;
   form.value = {
     title: '',
     description: '',
     fullDescription: '',
     image: '',
-    icon: '',
+    icon: null,
     features: '',
-    slug: ''
-  }
-  uploadedFile.value = null
-  dialog.value = true
-}
+    slug: '',
+  };
+  uploadedFile.value = null;
+  src.value = null;
+  dialog.value = true;
+};
 
-const editService = (service) => {
-  selectedService.value = service
+const editService = (service: Service) => {
+  selectedService.value = service;
   form.value = {
     ...service,
-    features: Array.isArray(service.features) ? service.features.join('\n') : service.features,
-    icon: service.icon || '' // Это значение должно соответствовать ожидаемому формату в Dropdown
-  }
-  uploadedFile.value = null
-  console.log('Editing service icon:', form.value.icon);
-  dialog.value = true
-}
+    features: Array.isArray(service.features) ? service.features.join('\n') : '',
+    icon: service.icon || null,
+  };
+  uploadedFile.value = null;
+  src.value = service.image || null;
+  dialog.value = true;
+};
 
-const confirmDelete = (service) => {
-  selectedService.value = service
-  deleteDialog.value = true
-}
+const confirmDelete = (service: Service) => {
+  selectedService.value = service;
+  deleteDialog.value = true;
+};
 
 const deleteService = async () => {
-  if (!selectedService.value) return
+  if (!selectedService.value?.id) return;
 
   try {
     if (selectedService.value.image) {
-      const imageRef = storageRef(storage, selectedService.value.image)
+      const imageRef = storageRef(storage, selectedService.value.image);
       await deleteObject(imageRef).catch(error => {
-        console.error('Error deleting image from storage:', error)
-      })
+        console.error('Error deleting image from storage:', error);
+        toast.add({
+          severity: 'warn',
+          summary: 'Попередження',
+          detail: 'Не вдалося видалити зображення зі сховища',
+          life: 3000,
+        });
+      });
     }
 
-    await deleteDoc(doc(db, 'services', selectedService.value.id))
-    await loadServices()
-    deleteDialog.value = false
+    await deleteDoc(doc(db, 'services', selectedService.value.id));
+    await loadServices();
+    deleteDialog.value = false;
 
     toast.add({
       severity: 'success',
       summary: 'Успіх',
       detail: 'Послугу видалено',
-      life: 3000
-    })
-  } catch (error) {
-    console.error('Error deleting service:', error)
+      life: 3000,
+    });
+  } catch (error: any) {
+    console.error('Error deleting service:', error);
     toast.add({
       severity: 'error',
       summary: 'Помилка',
       detail: 'Не вдалося видалити послугу',
-      life: 3000
-    })
+      life: 3000,
+    });
   }
-}
+};
 
 const deleteImage = async () => {
-  if (!selectedService.value || !selectedService.value.image) return
+  if (!selectedService.value?.id || !selectedService.value.image) return;
 
   try {
-    const imageRef = storageRef(storage, selectedService.value.image)
-    await deleteObject(imageRef)
+    const imageRef = storageRef(storage, selectedService.value.image);
+    await deleteObject(imageRef);
 
-    // Оновлюємо документ у Firestore, видаляючи поле 'image'
     await updateDoc(doc(db, 'services', selectedService.value.id), {
-      image: deleteField() // Використовуємо deleteField() для видалення поля
-    })
+      image: deleteField(),
+    });
 
-    // Очищаємо поле image у локальній формі (якщо використовується)
-    form.value.image = ''
-    src.value = null
+    form.value.image = '';
+    src.value = null;
 
     toast.add({
       severity: 'success',
       summary: 'Успіх',
       detail: 'Зображення видалено',
-      life: 3000
-    })
-  } catch (error) {
-    console.error('Error deleting image:', error)
+      life: 3000,
+    });
+  } catch (error: any) {
+    console.error('Error deleting image:', error);
     toast.add({
       severity: 'error',
       summary: 'Помилка',
       detail: 'Не вдалося видалити зображення',
-      life: 3000
-    })
+      life: 3000,
+    });
   }
-}
+};
 
 const saveService = async () => {
   try {
-    const serviceData = {
+    const serviceData: Omit<Service, 'id' | 'createdAt' | 'updatedAt'> = {
       ...form.value,
       slug: slugify(form.value.title, { lower: true }),
       features: form.value.features.split('\n').filter(f => f.trim()),
-      updatedAt: new Date()
-    }
+    };
 
     if (uploadedFile.value) {
-      const file = uploadedFile.value
-      const imageName = `services/${Date.now()}_${file.name}`
-      const imageRef = storageRef(storage, imageName)
-      const snapshot = await uploadBytes(imageRef, file)
-      serviceData.image = await getDownloadURL(snapshot.ref)
+      const file = uploadedFile.value;
+      const imageName = `services/${Date.now()}_${file.name}`;
+      const imageRef = storageRef(storage, imageName);
+      const snapshot = await uploadBytes(imageRef, file);
+      serviceData.image = await getDownloadURL(snapshot.ref);
 
-      if (selectedService.value?.image) {
-        const prevImageRef = storageRef(storage, selectedService.value.image)
+      if (selectedService.value?.image && selectedService.value.image !== serviceData.image) {
+        const prevImageRef = storageRef(storage, selectedService.value.image);
         await deleteObject(prevImageRef).catch(error => {
-          console.error('Error deleting previous image:', error)
-        })
+          console.error('Error deleting previous image:', error);
+          toast.add({
+            severity: 'warn',
+            summary: 'Попередження',
+            detail: 'Не вдалося видалити попереднє зображення зі сховища',
+            life: 3000,
+          });
+        });
       }
     }
 
-    if (selectedService.value) {
-      await updateDoc(doc(db, 'services', selectedService.value.id), serviceData)
+    if (selectedService.value?.id) {
+      await updateDoc(doc(db, 'services', selectedService.value.id), {
+        ...serviceData,
+        updatedAt: new Date(),
+      });
     } else {
       await addDoc(collection(db, 'services'), {
         ...serviceData,
-        createdAt: new Date()
-      })
+        createdAt: new Date(),
+      });
     }
 
-    await loadServices()
-    dialog.value = false
+    await loadServices();
+    dialog.value = false;
 
     toast.add({
       severity: 'success',
       summary: 'Успіх',
-      detail: selectedService.value ? 'Послугу оновлено' : 'Послугу створено',
-      life: 3000
-    })
-  } catch (error) {
-    console.error('Error saving service:', error)
+      detail: selectedService.value?.id ? 'Послугу оновлено' : 'Послугу створено',
+      life: 3000,
+    });
+  } catch (error: any) {
+    console.error('Error saving service:', error);
     toast.add({
       severity: 'error',
       summary: 'Помилка',
       detail: 'Не вдалося зберегти послугу',
-      life: 3000
-    })
+      life: 3000,
+    });
   } finally {
-    uploadedFile.value = null
+    uploadedFile.value = null;
+    src.value = null;
   }
-}
+};
 
-const src = ref(null);
-const onFileSelect = (event) => {
-  const file = event.files[0]
-  uploadedFile.value = file
+const onFileSelect = (event: any) => {
+  const file: File = event.files[0];
+  uploadedFile.value = file;
   const reader = new FileReader();
 
-  reader.onload = async (e) => {
-    src.value = e.target.result;
+  reader.onload = (e) => {
+    src.value = e.target?.result || null;
   };
 
   reader.readAsDataURL(file);
@@ -229,21 +274,9 @@ const onFileSelect = (event) => {
     severity: 'success',
     summary: 'Успіх',
     detail: 'Зображення готове до завантаження',
-    life: 3000
-  })
-}
-
-// Измененный код для списка иконок
-const primeIconsList = ref([]);
-onMounted(() => {
-  // Создаем простой массив иконок в правильном формате
-  primeIconsList.value = Object.values(PrimeIcons).map(iconName => {
-    return { name: iconName, value: iconName };
+    life: 3000,
   });
-
-  console.log(">> primeIconsList.value:", primeIconsList.value[0]);
-  loadServices();
-});
+};
 </script>
 
 <template>
@@ -273,7 +306,7 @@ onMounted(() => {
       </Column>
       <Column field="icon" header="Іконка">
         <template #body="{ data }">
-          <i :class="['pi', data.icon]" class="text-2xl"></i>
+          <i v-if="data.icon" :class="['pi', data.icon]" class="text-2xl"></i>
         </template>
       </Column>
       <Column field="features" header="Особливості">
@@ -352,7 +385,6 @@ onMounted(() => {
           />
         </div>
 
-        <!-- Измененный компонент выбора иконки -->
         <div class="field">
           <label for="icon">Іконка (виберіть з PrimeIcons)</label>
           <Dropdown
@@ -366,13 +398,13 @@ onMounted(() => {
           >
             <template #option="slotProps">
               <div class="flex align-items-center">
-                <i :class="[slotProps.option.value]" style="margin-right: 8px;"></i>
+                <i :class="['pi', slotProps.option.value]" style="margin-right: 8px;"></i>
                 <span>{{ slotProps.option.name }}</span>
               </div>
             </template>
             <template #value="slotProps">
               <div v-if="slotProps.value" class="flex align-items-center">
-                <i :class="[slotProps.value]" style="margin-right: 8px;"></i>
+                <i :class="['pi', slotProps.value]" style="margin-right: 8px;"></i>
                 <span>{{ slotProps.value }}</span>
               </div>
               <span v-else>Виберіть іконку</span>

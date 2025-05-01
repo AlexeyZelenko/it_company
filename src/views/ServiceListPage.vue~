@@ -1,45 +1,34 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useMeta } from 'vue-meta';
-import { useRouter } from 'vue-router';
-import Card from 'primevue/card';
-import Button from 'primevue/button';
-import { collection, getDocs, QuerySnapshot, DocumentData } from 'firebase/firestore';
-import { db } from '@/firebase';
+import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useMeta } from 'vue-meta'
+import { useRouter } from 'vue-router'
+import Card from 'primevue/card'
+import Button from 'primevue/button'
+import { collection, getDocs } from 'firebase/firestore'
+import { db } from '@/firebase'
 
-interface Service {
-  id?: string;
-  title: string;
-  slug?: string;
-  description?: string;
-  icon?: string;
-  features?: string[];
-  image?: string;
-}
-
-const { t } = useI18n();
-const router = useRouter();
-const services = ref<Service[]>([]);
-const loading = ref<boolean>(true);
+const { t } = useI18n()
+const router = useRouter()
+const services = ref([])
+const loading = ref(true)
 
 useMeta({
   title: t('services.title') + ' | IT Компанія',
   meta: [
-    { name: 'description', content: t('services.subtitle') },
-  ],
-});
+    { name: 'description', content: t('services.subtitle') }
+  ]
+})
 
 onMounted(async () => {
   try {
-    const servicesSnapshot: QuerySnapshot<DocumentData> = await getDocs(collection(db, 'services'));
+    const servicesSnapshot = await getDocs(collection(db, 'services'))
     services.value = servicesSnapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data(),
-    })) as Service[];
-  } catch (error: any) {
-    console.error('Error fetching services:', error);
-    // Fallback data with explicit typing
+      ...doc.data()
+    }))
+  } catch (error) {
+    console.error('Error fetching services:', error)
     services.value = [
       {
         id: '1',
@@ -51,9 +40,9 @@ onMounted(async () => {
           'Розробка корпоративних сайтів',
           'Створення інтернет-магазинів',
           'Розробка веб-додатків',
-          'Оптимізація продуктивності',
+          'Оптимізація продуктивності'
         ],
-        image: 'https://images.pexels.com/photos/574071/pexels-photo-574071.jpeg',
+        image: 'https://images.pexels.com/photos/574071/pexels-photo-574071.jpeg'
       },
       {
         id: '2',
@@ -61,8 +50,13 @@ onMounted(async () => {
         slug: 'mobile-apps',
         description: 'Розробка нативних та кросплатформенних мобільних додатків для iOS та Android.',
         icon: 'pi pi-mobile',
-        features: ['iOS розробка', 'Android розробка', 'React Native', 'Flutter розробка'],
-        image: 'https://images.pexels.com/photos/147413/twitter-facebook-together-exchange-of-information-147413.jpeg',
+        features: [
+          'iOS розробка',
+          'Android розробка',
+          'React Native',
+          'Flutter розробка'
+        ],
+        image: 'https://images.pexels.com/photos/147413/twitter-facebook-together-exchange-of-information-147413.jpeg'
       },
       {
         id: '3',
@@ -70,25 +64,29 @@ onMounted(async () => {
         slug: 'artificial-intelligence',
         description: 'Впровадження рішень на основі штучного інтелекту та машинного навчання.',
         icon: 'pi pi-chart-line',
-        features: ['Машинне навчання', 'Обробка природної мови', 'Комп\'ютерний зір', 'Предиктивна аналітика'],
-        image: 'https://images.pexels.com/photos/8386440/pexels-photo-8386440.jpeg',
-      },
-    ] as Service[];
+        features: [
+          'Машинне навчання',
+          'Обробка природної мови',
+          'Комп\'ютерний зір',
+          'Предиктивна аналітика'
+        ],
+        image: 'https://images.pexels.com/photos/8386440/pexels-photo-8386440.jpeg'
+      }
+    ]
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-});
+})
 
-const navigateToService = (slug: string | undefined) => {
-  if (slug) {
-    router.push({ name: 'service-detail', params: { slug } });
-  }
-};
+const navigateToService = (slug: string) => {
+  router.push({ name: 'service-detail', params: { slug } })
+}
 </script>
 
 <template>
   <div class="py-16">
     <div class="container-custom">
+      <!-- Header -->
       <div class="text-center mb-12">
         <h1 class="text-4xl md:text-5xl font-bold mb-4 text-gray-900">
           {{ t('services.title') }}
@@ -98,6 +96,7 @@ const navigateToService = (slug: string | undefined) => {
         </p>
       </div>
 
+      <!-- Services Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         <Card v-for="service in services" :key="service.id" class="flex flex-col justify-between shadow-sm hover:shadow-lg transition-shadow">
           <template #header v-if="service.image">
@@ -111,23 +110,24 @@ const navigateToService = (slug: string | undefined) => {
           </template>
           <template #content class="h-100 flex flex-col justify-between">
             <p class="text-gray-600 mb-6">{{ service.description }}</p>
-            <ul v-if="service.features" class="space-y-2 mb-6">
+            <ul class="space-y-2 mb-6">
               <li v-for="feature in service.features" :key="feature" class="flex items-center gap-2">
                 <i class="pi pi-check text-green-500"></i>
                 <span>{{ feature }}</span>
               </li>
             </ul>
-            <Button
-                :label="t('common.readMore')"
-                icon="pi pi-arrow-right"
-                iconPos="right"
-                class="w-full"
-                @click="navigateToService(service.slug)"
+            <Button 
+              :label="t('common.readMore')"
+              icon="pi pi-arrow-right"
+              iconPos="right"
+              class="w-full"
+              @click="navigateToService(service.slug)"
             />
           </template>
         </Card>
       </div>
 
+      <!-- CTA Section -->
       <div class="mt-16 text-center">
         <h2 class="text-2xl md:text-3xl font-bold mb-4">
           Готові почати проект?
@@ -135,11 +135,11 @@ const navigateToService = (slug: string | undefined) => {
         <p class="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
           Зв'яжіться з нами для обговорення вашого проекту та отримання безкоштовної консультації
         </p>
-        <Button
-            :label="t('services.cta')"
-            icon="pi pi-send"
-            class="p-button-lg"
-            @click="router.push({ name: 'contacts' })"
+        <Button 
+          :label="t('services.cta')"
+          icon="pi pi-send"
+          class="p-button-lg"
+          @click="router.push({ name: 'contacts' })"
         />
       </div>
     </div>

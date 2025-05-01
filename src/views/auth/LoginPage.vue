@@ -58,16 +58,19 @@ const login = async () => {
   
   try {
     await signInWithEmailAndPassword(auth, form.value.email, form.value.password)
-    
-    const redirectPath = route.query.redirect?.toString() || '/'
-    router.replace(redirectPath)
-    
+
     toast.add({
       severity: 'success',
       summary: 'Успіх',
       detail: 'Ви успішно увійшли',
       life: 3000
     })
+
+    // Перенаправлення на сторінку, з якої користувач прийшов
+    setTimeout(() => {
+      const redirectPath = route.query.redirect?.toString() || '/'
+      router.replace(redirectPath)
+    }, 1000)
   } catch (error) {
     console.error('Login error:', error)
     errors.value.general = 'Невірний email або пароль'

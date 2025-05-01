@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref, watchEffect, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Menubar from 'primevue/menubar'
-import SelectButton from 'primevue/selectbutton'
 import { signOut } from 'firebase/auth'
 import { auth } from '@/firebase'
+import { useToast } from 'primevue/usetoast'
 
+const currentUser = computed(() => auth.currentUser)
+const toast = useToast()
 const { t, locale } = useI18n()
 const router = useRouter()
 const isMobileMenuOpen = ref(false)
@@ -16,6 +18,12 @@ const languages = ref([
   { name: 'УКР', value: 'uk' },
   { name: 'ENG', value: 'en' }
 ])
+
+const login = () => {
+  console.log('Login clicked')
+  console.log('USER:', currentUser?.uid)
+  router.push({ name: 'login' })
+}
 
 // Обновленный вариант меню с прямыми маршрутами
 const menuItems = computed(() => [
@@ -47,29 +55,33 @@ const menuItems = computed(() => [
   {
     label: 'Admin',
     icon: 'pi pi-shield',
-    route: 'admin-dashboard'
+    route: 'admin-dashboard',
+    visible: auth.currentUser?.uid
   }
 ])
 
 // Конвертируем наши элементы меню в формат, понятный компоненту Menubar
 const menubarItems = computed(() =>
-    menuItems.value.map(item => ({
-      label: item.label,
-      icon: item.icon,
-      command: () => router.push({ name: item.route })
-    }))
+    menuItems.value
+        .filter(item => item.visible !== false)
+        .map(item => ({
+          label: item.label,
+          icon: item.icon,
+          command: () => router.push({ name: item.route })
+        }))
 )
 
-watchEffect(() => {
-  const handleScroll = () => {
-    scrolled.value = window.scrollY > 50
-  }
+// Корректный способ добавления обработчика прокрутки с использованием хуков жизненного цикла
+const handleScroll = () => {
+  scrolled.value = window.scrollY > 50
+}
 
+onMounted(() => {
   window.addEventListener('scroll', handleScroll)
+})
 
-  return () => {
-    window.removeEventListener('scroll', handleScroll)
-  }
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
 })
 
 const toggleMobileMenu = () => {
@@ -87,9 +99,19 @@ const navigateTo = (routeName) => {
 
 const handleLogout = async () => {
   try {
+    console.log('Logging out...', auth)
     await signOut(auth)
-    router.push({ name: 'login' })
-    closeMobileMenu()
+    toast.add({
+      severity: 'success',
+      summary: t('Ви вийшли'),
+      detail: t('Ви успішно вийшли з системи'),
+      life: 3000
+    })
+
+    setTimeout(() => {
+      router.push({ name: 'home' })
+      closeMobileMenu()
+    }, 1000)
   } catch (error) {
     console.error('Logout error:', error)
   }
@@ -132,28 +154,21 @@ const handleLogout = async () => {
             {{ lang.name }}
           </button>
         </div>
-
-        <template v-if="!auth.currentUser">
-          <Button
-              label="Увійти"
-              icon="pi pi-sign-in"
-              class="p-button-outlined"
-              @click="router.push({ name: 'login' })"
-          />
-          <Button
-              label="Реєстрація"
-              icon="pi pi-user-plus"
-              @click="router.push({ name: 'register' })"
-          />
-        </template>
-        <template v-else>
-          <Button
-              label="Вийти"
-              icon="pi pi-sign-out"
-              class="p-button-outlined"
-              @click="handleLogout"
-          />
-        </template>
+        {{currentUser?.uid}}
+        <Button
+            v-if="auth.currentUser"
+            label="Вийти"
+            icon="pi pi-sign-out"
+            class="p-button-outlined"
+            @click.prevent="handleLogout"
+        />
+        <Button
+            v-if="!auth.currentUser"
+            label="Увійти"
+            icon="pi pi-sign-in"
+            class="p-button-outlined"
+            @click.prevent="login"
+        />
       </div>
 
       <!-- Mobile Menu Button -->
@@ -189,6 +204,7 @@ const handleLogout = async () => {
     >
       <nav class="flex flex-col space-y-4">
         <a
+            v-show="item.visible !== false"
             v-for="item in menuItems"
             :key="item.label"
             href="#"

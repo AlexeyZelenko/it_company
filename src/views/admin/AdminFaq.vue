@@ -1,138 +1,159 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useToast } from 'primevue/usetoast'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
-import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
-import InputText from 'primevue/inputtext'
-import Editor from 'primevue/editor'
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore'
-import { db } from '@/firebase'
+import { ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useToast } from 'primevue/usetoast';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import Button from 'primevue/button';
+import Dialog from 'primevue/dialog';
+import InputText from 'primevue/inputtext';
+import Editor from 'primevue/editor';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, DocumentData, QuerySnapshot } from 'firebase/firestore';
+import { db } from '@/firebase';
 
-const { t } = useI18n()
-const toast = useToast()
+interface Faq {
+  id?: string;
+  question: string;
+  answer: string;
+  category: string;
+  order: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
 
-const faqs = ref([])
-const loading = ref(true)
-const dialog = ref(false)
-const deleteDialog = ref(false)
-const selectedFaq = ref(null)
+interface FormState {
+  question: string;
+  answer: string;
+  category: string;
+  order: number | null;
+}
 
-const form = ref({
+const { t } = useI18n();
+const toast = useToast();
+
+const faqs = ref<Faq[]>([]);
+const loading = ref<boolean>(true);
+const dialog = ref<boolean>(false);
+const deleteDialog = ref<boolean>(false);
+const selectedFaq = ref<Faq | null>(null);
+
+const form = ref<FormState>({
   question: '',
   answer: '',
   category: '',
-  order: 0
-})
+  order: 0,
+});
 
 onMounted(async () => {
-  await loadFaqs()
-})
+  await loadFaqs();
+});
 
 const loadFaqs = async () => {
   try {
-    const faqsSnapshot = await getDocs(collection(db, 'faqs'))
+    const faqsSnapshot: QuerySnapshot<DocumentData> = await getDocs(collection(db, 'faqs'));
     faqs.value = faqsSnapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data()
-    })).sort((a, b) => a.order - b.order)
-  } catch (error) {
-    console.error('Error loading FAQs:', error)
+      ...doc.data(),
+    })) as Faq[];
+    faqs.value.sort((a, b) => a.order - b.order);
+  } catch (error: any) {
+    console.error('Error loading FAQs:', error);
     toast.add({
       severity: 'error',
       summary: 'Помилка',
       detail: 'Не вдалося завантажити FAQ',
-      life: 3000
-    })
+      life: 3000,
+    });
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 const openNew = () => {
-  selectedFaq.value = null
+  selectedFaq.value = null;
   form.value = {
     question: '',
     answer: '',
     category: '',
-    order: faqs.value.length
-  }
-  dialog.value = true
-}
+    order: faqs.value.length,
+  };
+  dialog.value = true;
+};
 
-const editFaq = (faq) => {
-  selectedFaq.value = faq
-  form.value = { ...faq }
-  dialog.value = true
-}
+const editFaq = (faq: Faq) => {
+  selectedFaq.value = faq;
+  form.value = { ...faq };
+  dialog.value = true;
+};
 
-const confirmDelete = (faq) => {
-  selectedFaq.value = faq
-  deleteDialog.value = true
-}
+const confirmDelete = (faq: Faq) => {
+  selectedFaq.value = faq;
+  deleteDialog.value = true;
+};
 
 const deleteFaq = async () => {
-  if (!selectedFaq.value) return
+  if (!selectedFaq.value?.id) return;
 
   try {
-    await deleteDoc(doc(db, 'faqs', selectedFaq.value.id))
-    await loadFaqs()
-    deleteDialog.value = false
-    
+    await deleteDoc(doc(db, 'faqs', selectedFaq.value.id));
+    await loadFaqs();
+    deleteDialog.value = false;
+
     toast.add({
       severity: 'success',
       summary: 'Успіх',
       detail: 'FAQ видалено',
-      life: 3000
-    })
-  } catch (error) {
-    console.error('Error deleting FAQ:', error)
+      life: 3000,
+    });
+  } catch (error: any) {
+    console.error('Error deleting FAQ:', error);
     toast.add({
       severity: 'error',
       summary: 'Помилка',
       detail: 'Не вдалося видалити FAQ',
-      life: 3000
-    })
+      life: 3000,
+    });
   }
-}
+};
 
 const saveFaq = async () => {
   try {
-    const faqData = {
+    const faqData: Omit<Faq, 'id' | 'createdAt' | 'updatedAt'> = {
       ...form.value,
-      updatedAt: new Date()
-    }
+      order: form.value.order !== null ? form.value.order : 0,
+    };
 
-    if (selectedFaq.value) {
-      await updateDoc(doc(db, 'faqs', selectedFaq.value.id), faqData)
+    if (selectedFaq.value?.id) {
+      await updateDoc(doc(db, 'faqs', selectedFaq.value.id), {
+        ...faqData,
+        updatedAt: new Date(),
+      });
     } else {
       await addDoc(collection(db, 'faqs'), {
         ...faqData,
-        createdAt: new Date()
-      })
+        createdAt: new Date(),
+      });
     }
 
-    await loadFaqs()
-    dialog.value = false
-    
+    await loadFaqs();
+    dialog.value = false;
+
     toast.add({
       severity: 'success',
       summary: 'Успіх',
-      detail: selectedFaq.value ? 'FAQ оновлено' : 'FAQ створено',
-      life: 3000
-    })
-  } catch (error) {
-    console.error('Error saving FAQ:', error)
+      detail: selectedFaq.value?.id ? 'FAQ оновлено' : 'FAQ створено',
+      life: 3000,
+    });
+  } catch (error: any) {
+    console.error('Error saving FAQ:', error);
     toast.add({
       severity: 'error',
       summary: 'Помилка',
       detail: 'Не вдалося зберегти FAQ',
-      life: 3000
-    })
+      life: 3000,
+    });
   }
-}
+};
 </script>
 
 <template>
@@ -140,33 +161,33 @@ const saveFaq = async () => {
     <div class="flex justify-between items-center mb-4">
       <h1 class="text-2xl font-bold">Керування FAQ</h1>
       <Button
-        label="Нове питання"
-        icon="pi pi-plus"
-        @click="openNew"
+          label="Нове питання"
+          icon="pi pi-plus"
+          @click="openNew"
       />
     </div>
 
     <DataTable
-      :value="faqs"
-      :loading="loading"
-      responsiveLayout="scroll"
-      class="p-datatable-lg"
+        :value="faqs"
+        :loading="loading"
+        responsiveLayout="scroll"
+        class="p-datatable-lg"
     >
       <Column field="question" header="Питання" />
       <Column field="category" header="Категорія" />
-      <Column field="order" header="Порядок" />
+      <Column field="order" header="Порядок" sortable />
       <Column header="Дії">
         <template #body="{ data }">
           <div class="flex gap-2">
             <Button
-              icon="pi pi-pencil"
-              class="p-button-rounded p-button-success p-button-text"
-              @click="editFaq(data)"
+                icon="pi pi-pencil"
+                class="p-button-rounded p-button-success p-button-text"
+                @click="editFaq(data)"
             />
             <Button
-              icon="pi pi-trash"
-              class="p-button-rounded p-button-danger p-button-text"
-              @click="confirmDelete(data)"
+                icon="pi pi-trash"
+                class="p-button-rounded p-button-danger p-button-text"
+                @click="confirmDelete(data)"
             />
           </div>
         </template>
@@ -174,10 +195,10 @@ const saveFaq = async () => {
     </DataTable>
 
     <Dialog
-      v-model:visible="dialog"
-      :style="{width: '80vw'}"
-      :modal="true"
-      :header="selectedFaq ? 'Редагувати FAQ' : 'Нове питання'"
+        v-model:visible="dialog"
+        :style="{width: '80vw'}"
+        :modal="true"
+        :header="selectedFaq ? 'Редагувати FAQ' : 'Нове питання'"
     >
       <div class="grid grid-cols-1 gap-4">
         <div class="field">
@@ -188,8 +209,8 @@ const saveFaq = async () => {
         <div class="field">
           <label for="answer">Відповідь</label>
           <Editor
-            v-model="form.answer"
-            editorStyle="height: 320px"
+              v-model="form.answer"
+              editorStyle="height: 320px"
           />
         </div>
 
@@ -200,31 +221,31 @@ const saveFaq = async () => {
 
         <div class="field">
           <label for="order">Порядок</label>
-          <InputText id="order" v-model="form.order" type="number" class="w-full" />
+          <InputText id="order" v-model.number="form.order" type="number" class="w-full" />
         </div>
       </div>
 
       <template #footer>
         <Button
-          label="Скасувати"
-          icon="pi pi-times"
-          class="p-button-text"
-          @click="dialog = false"
+            label="Скасувати"
+            icon="pi pi-times"
+            class="p-button-text"
+            @click="dialog = false"
         />
         <Button
-          label="Зберегти"
-          icon="pi pi-check"
-          class="p-button-primary"
-          @click="saveFaq"
+            label="Зберегти"
+            icon="pi pi-check"
+            class="p-button-primary"
+            @click="saveFaq"
         />
       </template>
     </Dialog>
 
     <Dialog
-      v-model:visible="deleteDialog"
-      :style="{width: '450px'}"
-      header="Підтвердження"
-      :modal="true"
+        v-model:visible="deleteDialog"
+        :style="{width: '450px'}"
+        header="Підтвердження"
+        :modal="true"
     >
       <div class="confirmation-content">
         <i class="pi pi-exclamation-triangle mr-3" style="font-size: 2rem" />
@@ -232,16 +253,16 @@ const saveFaq = async () => {
       </div>
       <template #footer>
         <Button
-          label="Ні"
-          icon="pi pi-times"
-          class="p-button-text"
-          @click="deleteDialog = false"
+            label="Ні"
+            icon="pi pi-times"
+            class="p-button-text"
+            @click="deleteDialog = false"
         />
         <Button
-          label="Так"
-          icon="pi pi-check"
-          class="p-button-danger"
-          @click="deleteFaq"
+            label="Так"
+            icon="pi pi-check"
+            class="p-button-danger"
+            @click="deleteFaq"
         />
       </template>
     </Dialog>
